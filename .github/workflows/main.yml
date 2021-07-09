@@ -38,24 +38,45 @@ jobs:
             cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr ..
             make
             ls -al .
-      #- name: Package
-      #  run: |
-      #      ls -al ${pwd}
-      #      chmod +x ./../Ryujinx2/.travis/appimage.sh
-      #      ./../Ryujinx2/.travis/appimage.sh
-      #      mkdir artifacts/
-      #      cp ./mgba-x86_64.AppImage* artifacts/
-      #- name: Upload
-      #  run: |
-      #      ls -al artifacts/
-      #      wget -c https://github.com/tcnksm/ghr/releases/download/v0.13.0/ghr_v0.13.0_linux_amd64.tar.gz
-      #      tar xfv ghr_v0.13.0_linux_amd64.tar.gz
-      #      ghr_v0.13.0_linux_amd64/ghr -u qurious-pixel -r mgba -recreate -n 'Continuous build' -b "Ryujinx Build $name runs/$name" continuous artifacts/
-      #  env:
-      #    DEFAULT_BRANCH: appimage-actions
-      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #- name: Upload artifact
-      #  uses: actions/upload-artifact@v2
-      #  with:
-      #    name: mgba-appimage
-      #    path: artifacts
+            ls -al qt/
+      - name: Package
+        run: |
+          ls -al ${pwd}
+          BUILDPATH=$GITHUB_WORKSPACE/build
+          BUILDBIN=$BUILDPATH/qt/mgba-qt
+          cd /tmp
+          curl -sSfLO "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
+          chmod a+x linuxdeployqt*.AppImage
+          ./linuxdeployqt-continuous-x86_64.AppImage --appimage-extract
+          cd $GITHUB_WORKSPACE
+          mkdir -p squashfs-root/usr/bin
+          cp -P "$BUILDBIN" ./squashfs-root/usr/bin/
+          cp $GITHUB_WORKSPACE/res/mgba-256.png ./squashfs-root/mgba.png
+          cp $GITHUB_WORKSPACE/res/mgba-qt.desktop ./squashfs-root/mgba.desktop 
+          curl -sSfL https://github.com/AppImage/AppImageKit/releases/download/continuous/runtime-x86_64 -o ./squashfs-root/runtime
+          mkdir -p squashfs-root/usr/share/applications && cp ./squashfs-root/mgba.desktop ./squashfs-root/usr/share/applications
+          mkdir -p squashfs-root/usr/share/icons && cp ./squashfs-root/mgba.png ./squashfs-root/usr/share/icons
+          mkdir -p squashfs-root/usr/share/icons/hicolor/scalable/apps && cp ./squashfs-root/mgba.png ./squashfs-root/usr/share/icons/hicolor/scalable/apps
+          mkdir -p squashfs-root/usr/share/pixmaps && cp ./squashfs-root/mgba.png ./squashfs-root/usr/share/pixmaps
+          mkdir -p squashfs-root/usr/lib/
+          curl -sSfL "https://github.com/AppImage/AppImageKit/releases/download/continuous/AppRun-x86_64" -o $GITHUB_WORKSPACE/squashfs-root/AppRun
+          chmod a+x ./squashfs-root/AppRun
+          chmod a+x ./squashfs-root/runtime
+          echo "$name" > $GITHUB_WORKSPACE/squashfs-root/version.txt
+          /tmp/squashfs-root/AppRun $GITHUB_WORKSPACE/squashfs-root/usr/bin/mgba-qt -appimage -unsupported-allow-new-glibc -no-copy-copyright-files -no-translations -bundle-non-qt-libs
+          mkdir artifacts/
+          cp ./mgba-*.AppImage artifacts/
+      - name: Upload
+        run: |
+            ls -al artifacts/
+            wget -c https://github.com/tcnksm/ghr/releases/download/v0.13.0/ghr_v0.13.0_linux_amd64.tar.gz
+            tar xfv ghr_v0.13.0_linux_amd64.tar.gz
+            ghr_v0.13.0_linux_amd64/ghr -u qurious-pixel -r mgba -recreate -n 'Continuous build' -b "Ryujinx Build $name runs/$name" continuous artifacts/
+        env:
+          DEFAULT_BRANCH: appimage
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: mgba-appimage
+          path: artifacts
