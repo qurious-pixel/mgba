@@ -68,9 +68,10 @@ jobs:
           chmod a+x ./squashfs-root/AppRun
           chmod a+x ./squashfs-root/runtime
           echo "$name" > $GITHUB_WORKSPACE/squashfs-root/version.txt
+          export VERSION=emu
           /tmp/squashfs-root/AppRun $GITHUB_WORKSPACE/squashfs-root/usr/bin/mgba-qt -appimage -unsupported-allow-new-glibc -no-copy-copyright-files -no-translations -bundle-non-qt-libs
           mkdir artifacts/
-          cp ./mgba-*.AppImage artifacts/
+          cp ./mGBA-*.AppImage artifacts/
       - name: Upload
         run: |
             ls -al artifacts/
