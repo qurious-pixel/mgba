@@ -19,7 +19,7 @@ jobs:
           sudo apt-get install --no-install-recommends -y ccache cmake \
           git libavcodec-dev libavfilter-dev libavformat-dev libavresample-dev \
           libavutil-dev libcmocka-dev libedit-dev libelf-dev libminizip-dev \
-          libqt5opengl5-dev libsdl2-dev libswscale-dev \
+          libqt5opengl5-dev libsdl2-dev libswscale-dev qt5-default \
           libzip-dev qtmultimedia5-dev qttools5-dev qttools5-dev-tools zipcmp zipmerge ziptool
       - name: Install Packages if failed
         id: packages2
@@ -28,7 +28,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential ccache cmake \
           git libavcodec-dev libavfilter-dev libavformat-dev libavresample-dev \
           libavutil-dev libcmocka-dev libedit-dev libelf-dev libminizip-dev libpng-dev \
-          libqt5opengl5-dev libsdl2-dev libsqlite3-dev libswscale-dev \
+          libqt5opengl5-dev libsdl2-dev libsqlite3-dev libswscale-dev qt5-default \
           libzip-dev qtmultimedia5-dev qttools5-dev qttools5-dev-tools zipcmp zipmerge ziptool
       - name: Build
         id: build
@@ -42,11 +42,11 @@ jobs:
       - name: Package
         run: |
           ls -al ${pwd}
-          QT_BASE_DIR=/usr/
-          export QTDIR=$QT_BASE_DIR
-          export PATH=$QT_BASE_DIR/bin:$PATH
-          export LD_LIBRARY_PATH=$QT_BASE_DIR/lib/x86_64-linux-gnu:$QT_BASE_DIR/lib:$LD_LIBRARY_PATH
-          export PKG_CONFIG_PATH=$QT_BASE_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
+          #QT_BASE_DIR=/usr/
+          #export QTDIR=$QT_BASE_DIR
+          #export PATH=$QT_BASE_DIR/bin:$PATH
+          #export LD_LIBRARY_PATH=$QT_BASE_DIR/lib/x86_64-linux-gnu:$QT_BASE_DIR/lib:$LD_LIBRARY_PATH
+          #export PKG_CONFIG_PATH=$QT_BASE_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
           BUILDPATH=$GITHUB_WORKSPACE/build
           BUILDBIN=$BUILDPATH/qt/mgba-qt
           cd /tmp
