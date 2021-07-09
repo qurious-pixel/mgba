@@ -1,0 +1,59 @@
+name: Build job
+
+on:
+  push:
+  workflow_dispatch:  
+
+jobs:
+  build:
+    name: mgba appimage
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Packages
+        continue-on-error: true
+        id: packages
+        run: sudo apt-get install -y --no-install-recommends build-essential ccache cmake \
+          git libavcodec-dev libavfilter-dev libavformat-dev libavresample-dev \
+          libavutil-dev libcmocka-dev libedit-dev libelf-dev libpng-dev \
+          libqt5opengl5-dev libsdl2-dev libsqlite3-dev libswscale-dev \
+          libzip-dev qtmultimedia5-dev qttools5-dev qttools5-dev-tools && \
+      - name: Install Packages if failed
+        id: packages2
+        if: steps.packages.outcome=='failure'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential ccache cmake \
+          git libavcodec-dev libavfilter-dev libavformat-dev libavresample-dev \
+          libavutil-dev libcmocka-dev libedit-dev libelf-dev libpng-dev \
+          libqt5opengl5-dev libsdl2-dev libsqlite3-dev libswscale-dev \
+          libzip-dev qtmultimedia5-dev qttools5-dev qttools5-dev-tools && \
+      - name: Build
+        id: build
+        run: |
+            mkdir build
+            cd build
+            cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr ..
+            make
+            ls -al .
+      #- name: Package
+      #  run: |
+      #      ls -al ${pwd}
+      #      chmod +x ./../Ryujinx2/.travis/appimage.sh
+      #      ./../Ryujinx2/.travis/appimage.sh
+      #      mkdir artifacts/
+      #      cp ./mgba-x86_64.AppImage* artifacts/
+      #- name: Upload
+      #  run: |
+      #      ls -al artifacts/
+      #      wget -c https://github.com/tcnksm/ghr/releases/download/v0.13.0/ghr_v0.13.0_linux_amd64.tar.gz
+      #      tar xfv ghr_v0.13.0_linux_amd64.tar.gz
+      #      ghr_v0.13.0_linux_amd64/ghr -u qurious-pixel -r mgba -recreate -n 'Continuous build' -b "Ryujinx Build $name runs/$name" continuous artifacts/
+      #  env:
+      #    DEFAULT_BRANCH: appimage-actions
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #- name: Upload artifact
+      #  uses: actions/upload-artifact@v2
+      #  with:
+      #    name: mgba-appimage
+      #    path: artifacts
