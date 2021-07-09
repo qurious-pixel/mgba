@@ -15,7 +15,8 @@ jobs:
       - name: Install Packages
         continue-on-error: true
         id: packages
-        run: sudo apt-get install -y --no-install-recommends build-essential ccache cmake \
+        run: |
+          sudo apt-get install --no-install-recommends -y build-essential ccache cmake \
           git libavcodec-dev libavfilter-dev libavformat-dev libavresample-dev \
           libavutil-dev libcmocka-dev libedit-dev libelf-dev libpng-dev \
           libqt5opengl5-dev libsdl2-dev libsqlite3-dev libswscale-dev \
@@ -23,7 +24,8 @@ jobs:
       - name: Install Packages if failed
         id: packages2
         if: steps.packages.outcome=='failure'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential ccache cmake \
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential ccache cmake \
           git libavcodec-dev libavfilter-dev libavformat-dev libavresample-dev \
           libavutil-dev libcmocka-dev libedit-dev libelf-dev libpng-dev \
           libqt5opengl5-dev libsdl2-dev libsqlite3-dev libswscale-dev \
