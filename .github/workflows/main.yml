@@ -16,11 +16,11 @@ jobs:
         continue-on-error: true
         id: packages
         run: |
-          sudo apt-get install --no-install-recommends -y build-essential ccache cmake \
+          sudo apt-get install --no-install-recommends -y ccache cmake \
           git libavcodec-dev libavfilter-dev libavformat-dev libavresample-dev \
-          libavutil-dev libcmocka-dev libedit-dev libelf-dev libminizip-dev libpng-dev \
-          libqt5opengl5-dev libsdl2-dev libsqlite3-dev libswscale-dev \
-          libzip-dev qtmultimedia5-dev qttools5-dev qttools5-dev-tools zipcmp
+          libavutil-dev libcmocka-dev libedit-dev libelf-dev libminizip-dev \
+          libqt5opengl5-dev libsdl2-dev libswscale-dev \
+          libzip-dev qtmultimedia5-dev qttools5-dev qttools5-dev-tools zipcmp zipmerge
       - name: Install Packages if failed
         id: packages2
         if: steps.packages.outcome=='failure'
@@ -29,7 +29,7 @@ jobs:
           git libavcodec-dev libavfilter-dev libavformat-dev libavresample-dev \
           libavutil-dev libcmocka-dev libedit-dev libelf-dev libminizip-dev libpng-dev \
           libqt5opengl5-dev libsdl2-dev libsqlite3-dev libswscale-dev \
-          libzip-dev qtmultimedia5-dev qttools5-dev qttools5-dev-tools zipcmp
+          libzip-dev qtmultimedia5-dev qttools5-dev qttools5-dev-tools zipcmp zipmerge
       - name: Build
         id: build
         run: |
