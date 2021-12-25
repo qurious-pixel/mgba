@@ -545,10 +545,14 @@ static void GBAVideoSoftwareRendererDrawScanline(struct GBAVideoRenderer* render
 
 	if (!dirty) {
 		if (GBARegisterDISPCNTGetMode(softwareRenderer->dispcnt) != 0) {
-			softwareRenderer->bg[2].sx += softwareRenderer->bg[2].dmx;
-			softwareRenderer->bg[2].sy += softwareRenderer->bg[2].dmy;
-			softwareRenderer->bg[3].sx += softwareRenderer->bg[3].dmx;
-			softwareRenderer->bg[3].sy += softwareRenderer->bg[3].dmy;
+			if (softwareRenderer->bg[2].enabled == 4) {
+				softwareRenderer->bg[2].sx += softwareRenderer->bg[2].dmx;
+				softwareRenderer->bg[2].sy += softwareRenderer->bg[2].dmy;
+			}
+			if (softwareRenderer->bg[3].enabled == 4) {
+				softwareRenderer->bg[3].sx += softwareRenderer->bg[3].dmx;
+				softwareRenderer->bg[3].sy += softwareRenderer->bg[3].dmy;
+			}
 		}
 		return;
 	}
@@ -570,12 +574,12 @@ static void GBAVideoSoftwareRendererDrawScanline(struct GBAVideoRenderer* render
 
 	int w;
 	unsigned priority;
-	for (priority = 0; priority < 4; ++priority) {
-		softwareRenderer->end = 0;
-		for (w = 0; w < softwareRenderer->nWindows; ++w) {
-			softwareRenderer->start = softwareRenderer->end;
-			softwareRenderer->end = softwareRenderer->windows[w].endX;
-			softwareRenderer->currentWindow = softwareRenderer->windows[w].control;
+	softwareRenderer->end = 0;
+	for (w = 0; w < softwareRenderer->nWindows; ++w) {
+		softwareRenderer->start = softwareRenderer->end;
+		softwareRenderer->end = softwareRenderer->windows[w].endX;
+		softwareRenderer->currentWindow = softwareRenderer->windows[w].control;
+		for (priority = 0; priority < 4; ++priority) {
 			if (spriteLayers & (1 << priority)) {
 				GBAVideoSoftwareRendererPostprocessSprite(softwareRenderer, priority);
 			}
@@ -621,25 +625,29 @@ static void GBAVideoSoftwareRendererDrawScanline(struct GBAVideoRenderer* render
 	GBAVideoSoftwareRendererPostprocessBuffer(softwareRenderer);
 
 	if (GBARegisterDISPCNTGetMode(softwareRenderer->dispcnt) != 0) {
-		softwareRenderer->bg[2].sx += softwareRenderer->bg[2].dmx;
-		softwareRenderer->bg[2].sy += softwareRenderer->bg[2].dmy;
-		softwareRenderer->bg[3].sx += softwareRenderer->bg[3].dmx;
-		softwareRenderer->bg[3].sy += softwareRenderer->bg[3].dmy;
+		if (softwareRenderer->bg[2].enabled == 4) {
+			softwareRenderer->bg[2].sx += softwareRenderer->bg[2].dmx;
+			softwareRenderer->bg[2].sy += softwareRenderer->bg[2].dmy;
+		}
+		if (softwareRenderer->bg[3].enabled == 4) {
+			softwareRenderer->bg[3].sx += softwareRenderer->bg[3].dmx;
+			softwareRenderer->bg[3].sy += softwareRenderer->bg[3].dmy;
+		}
 	}
 
-	if (softwareRenderer->bg[0].enabled > 0 && softwareRenderer->bg[0].enabled < 4) {
+	if (softwareRenderer->bg[0].enabled != 0 && softwareRenderer->bg[0].enabled < 4) {
 		++softwareRenderer->bg[0].enabled;
 		DIRTY_SCANLINE(softwareRenderer, y);
 	}
-	if (softwareRenderer->bg[1].enabled > 0 && softwareRenderer->bg[1].enabled < 4) {
+	if (softwareRenderer->bg[1].enabled != 0 && softwareRenderer->bg[1].enabled < 4) {
 		++softwareRenderer->bg[1].enabled;
 		DIRTY_SCANLINE(softwareRenderer, y);
 	}
-	if (softwareRenderer->bg[2].enabled > 0 && softwareRenderer->bg[2].enabled < 4) {
+	if (softwareRenderer->bg[2].enabled != 0 && softwareRenderer->bg[2].enabled < 4) {
 		++softwareRenderer->bg[2].enabled;
 		DIRTY_SCANLINE(softwareRenderer, y);
 	}
-	if (softwareRenderer->bg[3].enabled > 0 && softwareRenderer->bg[3].enabled < 4) {
+	if (softwareRenderer->bg[3].enabled != 0 && softwareRenderer->bg[3].enabled < 4) {
 		++softwareRenderer->bg[3].enabled;
 		DIRTY_SCANLINE(softwareRenderer, y);
 	}
@@ -717,14 +725,22 @@ static void GBAVideoSoftwareRendererPutPixels(struct GBAVideoRenderer* renderer,
 static void _enableBg(struct GBAVideoSoftwareRenderer* renderer, int bg, bool active) {
 	int wasActive = renderer->bg[bg].enabled;
 	if (!active) {
-		renderer->bg[bg].enabled = 0;
+		if (renderer->nextY == 0 || (wasActive > 0 && wasActive < 4)) {
+			renderer->bg[bg].enabled = 0;
+		} else if (wasActive == 4) {
+			renderer->bg[bg].enabled = -2;
+		}
 	} else if (!wasActive && active) {
-		if (renderer->nextY == 0 || GBARegisterDISPCNTGetMode(renderer->dispcnt) > 2) {
+		if (renderer->nextY == 0) {
 			// TODO: Investigate in more depth how switching background works in different modes
 			renderer->bg[bg].enabled = 4;
+		} else if (GBARegisterDISPCNTGetMode(renderer->dispcnt) > 2) {
+			renderer->bg[bg].enabled = 2;
 		} else {
 			renderer->bg[bg].enabled = 1;
 		}
+	} else if (wasActive < 0 && active) {
+		renderer->bg[bg].enabled = 4;
 	}
 }
 

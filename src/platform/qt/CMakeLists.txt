@@ -24,7 +24,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 find_package(Qt5 COMPONENTS Core Widgets Network Multimedia)
 
-if(NOT BUILD_GL AND NOT BUILD_GLES2)
+if(NOT BUILD_GL AND NOT BUILD_GLES2 AND NOT BUILD_GLES3)
 	message(WARNING "OpenGL is recommended to build the Qt port")
 endif()
 
@@ -60,6 +60,8 @@ set(SOURCE_FILES
 	AbstractUpdater.cpp
 	Action.cpp
 	ActionMapper.cpp
+	ApplicationUpdater.cpp
+	ApplicationUpdatePrompt.cpp
 	AssetInfo.cpp
 	AssetTile.cpp
 	AssetView.cpp
@@ -122,6 +124,7 @@ set(SOURCE_FILES
 
 set(UI_FILES
 	AboutScreen.ui
+	ApplicationUpdatePrompt.ui
 	ArchiveInspector.ui
 	AssetTile.ui
 	BattleChipView.ui
@@ -227,12 +230,22 @@ if(USE_DISCORD_RPC)
 endif()
 
 qt5_add_resources(RESOURCES resources.qrc)
+if(BUILD_UPDATER)
+	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/updater.qrc.in ${CMAKE_CURRENT_BINARY_DIR}/updater.qrc)
+	qt5_add_resources(UPDATER_RESOURCES ${CMAKE_CURRENT_BINARY_DIR}/updater.qrc)
+	list(APPEND RESOURCES ${UPDATER_RESOURCES})
+endif()
 if(APPLE)
 	set(MACOSX_BUNDLE_ICON_FILE mgba.icns)
 	set(MACOSX_BUNDLE_BUNDLE_VERSION ${LIB_VERSION_STRING})
 	set(MACOSX_BUNDLE_BUNDLE_NAME ${PROJECT_NAME})
 	set(MACOSX_BUNDLE_GUI_IDENTIFIER com.endrift.${BINARY_NAME}-qt)
 	set_source_files_properties(${CMAKE_SOURCE_DIR}/res/mgba.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+	if(DISTBUILD)
+		set(APPDIR ".")
+	else()
+		set(APPDIR "Applications")
+	endif()
 endif()
 if(WIN32)
 	configure_file(${CMAKE_SOURCE_DIR}/res/mgba.rc.in ${CMAKE_BINARY_DIR}/res/mgba.rc)
@@ -241,7 +254,7 @@ if(WIN32)
 endif()
 if(NOT DEFINED DATADIR)
 	if(APPLE)
-		set(DATADIR Applications/${PROJECT_NAME}.app/Contents/Resources)
+		set(DATADIR ${APPDIR}/${PROJECT_NAME}.app/Contents/Resources)
 	elseif(WIN32 AND NOT WIN32_UNIX_PATHS)
 		set(DATADIR ".")
 	else()
@@ -297,6 +310,9 @@ set_target_properties(${BINARY_NAME}-qt PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CM
 
 if(WIN32)
 	set_target_properties(${BINARY_NAME}-qt PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+	if(NOT MSVC)
+		target_link_libraries(${BINARY_NAME}-qt -municode)
+	endif()
 endif()
 
 list(APPEND QT_LIBRARIES Qt5::Widgets Qt5::Network)
@@ -328,11 +344,11 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}" PARENT_SCOPE)
 
 install(TARGETS ${BINARY_NAME}-qt
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT ${BINARY_NAME}-qt
-	BUNDLE DESTINATION Applications COMPONENT ${BINARY_NAME}-qt)
+	BUNDLE DESTINATION ${APPDIR} COMPONENT ${BINARY_NAME}-qt)
 if(UNIX AND NOT APPLE)
 	install(FILES ${CMAKE_SOURCE_DIR}/res/mgba-qt.desktop DESTINATION share/applications COMPONENT ${BINARY_NAME}-qt)
 endif()
-if(UNIX)
+if(UNIX AND NOT (APPLE AND DISTBUILD))
 	install(FILES ${CMAKE_SOURCE_DIR}/doc/mgba-qt.6 DESTINATION ${MANDIR}/man6 COMPONENT ${BINARY_NAME}-qt)
 endif()
 if(APPLE OR WIN32)
@@ -365,7 +381,7 @@ if(APPLE)
 		if(DEFINED CROSS_ROOT)
 			set(DEPLOY_OPTIONS ${DEPLOY_OPTIONS} -R "${CROSS_ROOT}")
 		endif()
-		install(CODE "execute_process(COMMAND \"${CMAKE_SOURCE_DIR}/tools/deploy-mac.py\" -v ${DEPLOY_OPTIONS} \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/Applications/${PROJECT_NAME}.app\")")
+		install(CODE "execute_process(COMMAND \"${CMAKE_SOURCE_DIR}/tools/deploy-mac.py\" -v ${DEPLOY_OPTIONS} \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${APPDIR}/${PROJECT_NAME}.app\")")
 	endif()
 elseif(WIN32)
 	if(CMAKE_MAJOR_VERSION EQUAL 3 AND CMAKE_MINOR_VERSION EQUAL 8)

@@ -5,12 +5,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "DisplayGL.h"
 
-#if defined(BUILD_GL) || defined(BUILD_GLES2)
+#if defined(BUILD_GL) || defined(BUILD_GLES2) || defined(BUILD_GLES3) || defined(USE_EPOXY)
 
 #include <QApplication>
 #include <QMutexLocker>
 #include <QOffscreenSurface>
 #include <QOpenGLContext>
+#include <QOpenGLFunctions>
 #include <QOpenGLPaintDevice>
 #include <QResizeEvent>
 #include <QScreen>
@@ -24,7 +25,7 @@
 #ifdef BUILD_GL
 #include "platform/opengl/gl.h"
 #endif
-#ifdef BUILD_GLES2
+#if defined(BUILD_GLES2) || defined(BUILD_GLES3)
 #include "platform/opengl/gles2.h"
 #ifdef _WIN32
 #include <epoxy/wgl.h>
@@ -125,7 +126,22 @@ bool DisplayGL::supportsFormat(const QSurfaceFormat& format) {
 		           context.format().profile() == QSurfaceFormat::CompatibilityProfile ||
 		           context.format().testOption(QSurfaceFormat::DeprecatedFunctions))) {
 			// Supports the old stuff
-			s_supports[format] = true;
+			QOffscreenSurface surface;
+			surface.create();
+			if (!context.makeCurrent(&surface)) {
+				s_supports[format] = false;
+				return false;
+			}
+#ifdef Q_OS_WIN
+			QLatin1String renderer(reinterpret_cast<const char*>(context.functions()->glGetString(GL_RENDERER)));
+			if (renderer == "GDI Generic") {
+				// Windows' software OpenGL 1.1 implementation is not sufficient
+				s_supports[format] = false;
+				return false;
+			}
+#endif
+			s_supports[format] = context.hasExtension("GL_EXT_blend_color"); // Core as of 1.2
+			context.doneCurrent();
 		} else if (!context.isOpenGLES() && format.version() >= qMakePair(2, 1) && foundVersion < qMakePair(3, 0) && foundVersion >= qMakePair(2, 1)) {
 			// Weird edge case we support if ARB_framebuffer_object is present
 			QOffscreenSurface surface;
@@ -294,13 +310,13 @@ void PainterGL::create() {
 #ifdef BUILD_GL
 	mGLContext* glBackend;
 #endif
-#ifdef BUILD_GLES2
+#if defined(BUILD_GLES2) || defined(BUILD_GLES3)
 	mGLES2Context* gl2Backend;
 #endif
 
 	m_window = std::make_unique<QOpenGLPaintDevice>();
 
-#ifdef BUILD_GLES2
+#if defined(BUILD_GLES2) || defined(BUILD_GLES3)
 	auto version = m_format.version();
 	if (version >= qMakePair(2, 0)) {
 		gl2Backend = static_cast<mGLES2Context*>(malloc(sizeof(mGLES2Context)));
@@ -326,7 +342,7 @@ void PainterGL::create() {
 	};
 
 	m_backend->init(m_backend, 0);
-#ifdef BUILD_GLES2
+#if defined(BUILD_GLES2) || defined(BUILD_GLES3)
 	if (m_supportsShaders) {
 		m_shader.preprocessShader = static_cast<void*>(&reinterpret_cast<mGLES2Context*>(m_backend)->initialShader);
 	}
@@ -343,7 +359,7 @@ void PainterGL::destroy() {
 		return;
 	}
 	makeCurrent();
-#ifdef BUILD_GLES2
+#if defined(BUILD_GLES2) || defined(BUILD_GLES3)
 	if (m_shader.passes) {
 		mGLES2ShaderFree(&m_shader);
 	}
@@ -420,7 +436,7 @@ void PainterGL::filter(bool filter) {
 void PainterGL::start() {
 	makeCurrent();
 
-#ifdef BUILD_GLES2
+#if defined(BUILD_GLES2) || defined(BUILD_GLES3)
 	if (m_supportsShaders && m_shader.passes) {
 		mGLES2ShaderAttach(reinterpret_cast<mGLES2Context*>(m_backend), static_cast<mGLES2Shader*>(m_shader.passes), m_shader.nPasses);
 	}
@@ -457,12 +473,13 @@ void PainterGL::draw() {
 		m_delayTimer.start();
 	} else {
 		if (sync->audioWait || sync->videoFrameWait) {
-			while (m_delayTimer.nsecsElapsed() + 1'000'000 < 1'000'000'000 / sync->fpsTarget) {
+			while (m_delayTimer.nsecsElapsed() + 1000000 < 1000000000 / sync->fpsTarget) {
 				QThread::usleep(500);
 			}
-			forceRedraw = true;
-		} else if (!forceRedraw) {
-			forceRedraw = m_delayTimer.nsecsElapsed() + 1'000'000 >= 1'000'000'000 / m_surface->screen()->refreshRate();
+			forceRedraw = sync->videoFrameWait;
+		}
+		if (!forceRedraw) {
+			forceRedraw = m_delayTimer.nsecsElapsed() + 1000000 >= 1000000000 / m_surface->screen()->refreshRate();
 		}
 	}
 	mCoreSyncWaitFrameEnd(sync);
@@ -520,19 +537,17 @@ void PainterGL::unpause() {
 }
 
 void PainterGL::performDraw() {
-	m_painter.begin(m_window.get());
-	m_painter.beginNativePainting();
 	float r = m_surface->devicePixelRatio();
 	m_backend->resized(m_backend, m_size.width() * r, m_size.height() * r);
 	if (m_buffer) {
 		m_backend->postFrame(m_backend, m_buffer);
 	}
 	m_backend->drawFrame(m_backend);
-	m_painter.endNativePainting();
 	if (m_showOSD && m_messagePainter) {
+		m_painter.begin(m_window.get());
 		m_messagePainter->paint(&m_painter);
+		m_painter.end();
 	}
-	m_painter.end();
 }
 
 void PainterGL::enqueue(const uint32_t* backing) {
@@ -597,7 +612,7 @@ void PainterGL::setShaders(struct VDir* dir) {
 	if (!supportsShaders()) {
 		return;
 	}
-#ifdef BUILD_GLES2
+#if defined(BUILD_GLES2) || defined(BUILD_GLES3)
 	if (m_shader.passes) {
 		mGLES2ShaderDetach(reinterpret_cast<mGLES2Context*>(m_backend));
 		mGLES2ShaderFree(&m_shader);
@@ -611,7 +626,7 @@ void PainterGL::clearShaders() {
 	if (!supportsShaders()) {
 		return;
 	}
-#ifdef BUILD_GLES2
+#if defined(BUILD_GLES2) || defined(BUILD_GLES3)
 	if (m_shader.passes) {
 		mGLES2ShaderDetach(reinterpret_cast<mGLES2Context*>(m_backend));
 		mGLES2ShaderFree(&m_shader);
@@ -624,7 +639,7 @@ VideoShader* PainterGL::shaders() {
 }
 
 int PainterGL::glTex() {
-#ifdef BUILD_GLES2
+#if defined(BUILD_GLES2) || defined(BUILD_GLES3)
 	if (supportsShaders()) {
 		mGLES2Context* gl2Backend = reinterpret_cast<mGLES2Context*>(m_backend);
 		return gl2Backend->tex;
